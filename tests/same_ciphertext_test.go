@@ -1,4 +1,4 @@
-package testpaillier
+package tests
 
 import (
 	"math/big"
@@ -9,7 +9,7 @@ import (
 
 func TestSameCipherWithSameR(t *testing.T) {
 	// set parameters
-	bitSize := 512
+	bitSize := 254
 	s := uint8(1)
 	l := uint8(5) // number of shares
 	k := uint8(3) // threshold
