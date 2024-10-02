@@ -1,0 +1,6 @@
+[submodule "circom/circom-ecdsa"]
+	path = circom/circom-ecdsa
+	url = https://github.com/agnxsh/circom-ecdsa
+[submodule "circom/circom-rsa-verify"]
+	path = circom/circom-rsa-verify
+	url = https://github.com/zkp-application/circom-rsa-verify

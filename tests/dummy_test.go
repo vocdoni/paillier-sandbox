@@ -7,8 +7,6 @@ import (
 	"github.com/niclabs/tcpaillier"
 )
 
-var one = big.NewInt(1)
-
 func dummyEncrypt(g, nToS, nToSPlusOne, msg, r *big.Int) *big.Int {
 	// (n+1)^m % n^(s+1)
 	m := new(big.Int).Mod(msg, nToSPlusOne)
@@ -46,19 +44,10 @@ func TestDummy(t *testing.T) {
 		t.Errorf("Error encrypting: %v\n", err)
 		return
 	}
-	// s
-	bigS := big.NewInt(int64(pk.S))
-	// n+1
-	nPlusOne := new(big.Int).Add(pk.N, one)
-	// (s+1)
-	sPlusOne := new(big.Int).Add(bigS, one)
-	// n^s
-	nToS := new(big.Int).Exp(pk.N, bigS, nil)
-	// n^(s+1)
-	nToSPlusOne := new(big.Int).Exp(pk.N, sPlusOne, nil)
-
+	// get the cached constant values
+	cv := pk.Cache()
 	// cipher raw with dummy encryption and compare with c1
-	if c2 := dummyEncrypt(nPlusOne, nToS, nToSPlusOne, raw, r); c1.Cmp(c2) != 0 {
+	if c2 := dummyEncrypt(cv.NPlusOne, cv.NToS, cv.NToSPlusOne, raw, r); c1.Cmp(c2) != 0 {
 		t.Error("Ciphertexts are different")
 	}
 }
