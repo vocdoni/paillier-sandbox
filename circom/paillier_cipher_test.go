@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"math/big"
-	"os"
 	"testing"
 
-	"github.com/iden3/go-rapidsnark/prover"
-	"github.com/iden3/go-rapidsnark/witness"
 	"github.com/niclabs/tcpaillier"
 )
 
@@ -54,38 +51,9 @@ func TestPaillierCipher(t *testing.T) {
 	}
 	bInputs, _ := json.Marshal(inputs)
 	log.Println("Inputs:", string(bInputs))
-	finalInputs, err := witness.ParseInputs(bInputs)
+	proofData, pubSignals, err := compileAndGenerateProof(bInputs, wasmFile, zkeyFile)
 	if err != nil {
-		t.Fatalf("Error parsing inputs: %v", err)
-		return
-	}
-	// read wasm file
-	bWasm, err := os.ReadFile(wasmFile)
-	if err != nil {
-		log.Fatalf("Error reading wasm file: %v\n", err)
-		return
-	}
-	// read zkey file
-	bZkey, err := os.ReadFile(zkeyFile)
-	if err != nil {
-		log.Fatalf("Error reading zkey file: %v\n", err)
-		return
-	}
-	// instance witness calculator
-	calc, err := witness.NewCircom2WitnessCalculator(bWasm, true)
-	if err != nil {
-		t.Fatalf("Error creating witness calculator: %v", err)
-		return
-	}
-	// calculate witness
-	w, err := calc.CalculateWTNSBin(finalInputs, true)
-	if err != nil {
-		t.Fatalf("Error calculating witness: %v", err)
-		return
-	}
-	proofData, pubSignals, err := prover.Groth16ProverRaw(bZkey, w)
-	if err != nil {
-		t.Fatalf("Error generating proof: %v", err)
+		t.Errorf("Error compiling and generating proof: %v\n", err)
 		return
 	}
 	log.Println("Proof data:", proofData)

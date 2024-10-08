@@ -1,6 +1,12 @@
 package circom
 
-import "math/big"
+import (
+	"math/big"
+	"os"
+
+	"github.com/iden3/go-rapidsnark/prover"
+	"github.com/iden3/go-rapidsnark/witness"
+)
 
 // bigIntToArray converts a big.Int into an array of k big.Int elements, it is
 // the go implementation of the javascript function:
@@ -42,4 +48,32 @@ func bigIntArrayToStringArray(arr []*big.Int) []string {
 		ret[i] = v.String()
 	}
 	return ret
+}
+
+func compileAndGenerateProof(inputs []byte, wasmFile, zkeyFile string) (string, string, error) {
+	finalInputs, err := witness.ParseInputs(inputs)
+	if err != nil {
+		return "", "", err
+	}
+	// read wasm file
+	bWasm, err := os.ReadFile(wasmFile)
+	if err != nil {
+		return "", "", err
+	}
+	// read zkey file
+	bZkey, err := os.ReadFile(zkeyFile)
+	if err != nil {
+		return "", "", err
+	}
+	// instance witness calculator
+	calc, err := witness.NewCircom2WitnessCalculator(bWasm, true)
+	if err != nil {
+		return "", "", err
+	}
+	// calculate witness
+	w, err := calc.CalculateWTNSBin(finalInputs, true)
+	if err != nil {
+		return "", "", err
+	}
+	return prover.Groth16ProverRaw(bZkey, w)
 }

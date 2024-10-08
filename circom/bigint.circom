@@ -174,7 +174,7 @@ template BigLimbCheck(N, n) {
     component isbits[N];
     for (var i = 0; i < N; i++) {
         isbits[i] = IsNBits(n);
-        isbits[i].val <== a[i];
+        isbits[i].in <== a[i];
     }
 }
 
@@ -209,7 +209,7 @@ template BigEq(N, n) {
     component safe[l];
     for (var i = 0; i < l; i++) {
         safe[i] = IsSignedNBits(n + logN);
-        safe[i].val <== Zero[i];
+        safe[i].in <== Zero[i];
     }
 }
 
