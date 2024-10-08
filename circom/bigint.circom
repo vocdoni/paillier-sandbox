@@ -1,566 +1,345 @@
-pragma circom 2.0.2;
+pragma circom 2.0.0;
 
-include "./node_modules/circomlib/circuits/comparators.circom";
-include "./node_modules/circomlib/circuits/bitify.circom";
-include "./node_modules/circomlib/circuits/gates.circom";
+include "bits.circom";
 
-include "bigint_func.circom";
-
-// addition mod 2**n with carry bit
-template ModSum(n) {
-    assert(n <= 252);
-    signal input a;
-    signal input b;
-    signal output sum;
-    signal output carry;
-
-    component n2b = Num2Bits(n + 1);
-    n2b.in <== a + b;
-    carry <== n2b.out[n];
-    sum <== a + b - carry * (1 << n);
-}
-
-// a - b
-template ModSub(n) {
-    assert(n <= 252);
-    signal input a;
-    signal input b;
-    signal output out;
-    signal output borrow;
-    component lt = LessThan(n);
-    lt.in[0] <== a;
-    lt.in[1] <== b;
-    borrow <== lt.out;
-    out <== borrow * (1 << n) + a - b;
-}
-
-// a - b - c
-// assume a - b - c + 2**n >= 0
-template ModSubThree(n) {
-    assert(n + 2 <= 253);
-    signal input a;
-    signal input b;
-    signal input c;
-    assert(a - b - c + (1 << n) >= 0);
-    signal output out;
-    signal output borrow;
-    signal b_plus_c;
-    b_plus_c <== b + c;
-    component lt = LessThan(n + 1);
-    lt.in[0] <== a;
-    lt.in[1] <== b_plus_c;
-    borrow <== lt.out;
-    out <== borrow * (1 << n) + a - b_plus_c;
-}
-
-template ModSumThree(n) {
-    assert(n + 2 <= 253);
-    signal input a;
-    signal input b;
-    signal input c;
-    signal output sum;
-    signal output carry;
-
-    component n2b = Num2Bits(n + 2);
-    n2b.in <== a + b + c;
-    carry <== n2b.out[n] + 2 * n2b.out[n + 1];
-    sum <== a + b + c - carry * (1 << n);
-}
-
-template ModSumFour(n) {
-    assert(n + 2 <= 253);
-    signal input a;
-    signal input b;
-    signal input c;
-    signal input d;
-    signal output sum;
-    signal output carry;
-
-    component n2b = Num2Bits(n + 2);
-    n2b.in <== a + b + c + d;
-    carry <== n2b.out[n] + 2 * n2b.out[n + 1];
-    sum <== a + b + c + d - carry * (1 << n);
-}
-
-// product mod 2**n with carry
-template ModProd(n) {
-    assert(n <= 126);
-    signal input a;
-    signal input b;
-    signal output prod;
-    signal output carry;
-
-    component n2b = Num2Bits(2 * n);
-    n2b.in <== a * b;
-
-    component b2n1 = Bits2Num(n);
-    component b2n2 = Bits2Num(n);
-    var i;
-    for (i = 0; i < n; i++) {
-        b2n1.in[i] <== n2b.out[i];
-        b2n2.in[i] <== n2b.out[i + n];
+function varmax(a, b) {
+    if (a > b) {
+        return a;
+    } else {
+        return b;
     }
-    prod <== b2n1.out;
-    carry <== b2n2.out;
 }
 
-// split a n + m bit input into two outputs
-template Split(n, m) {
-    assert(n <= 126);
-    signal input in;
-    signal output small;
-    signal output big;
-
-    small <-- in % (1 << n);
-    big <-- in \ (1 << n);
-
-    component n2b_small = Num2Bits(n);
-    n2b_small.in <== small;
-    component n2b_big = Num2Bits(m);
-    n2b_big.in <== big;
-
-    in === small + big * (1 << n);
+function varmin(a, b) {
+    if (a < b) {
+        return a;
+    } else {
+        return b;
+    }
 }
 
-// split a n + m + k bit input into three outputs
-template SplitThree(n, m, k) {
-    assert(n <= 126);
-    signal input in;
-    signal output small;
-    signal output medium;
-    signal output big;
-
-    small <-- in % (1 << n);
-    medium <-- (in \ (1 << n)) % (1 << m);
-    big <-- in \ (1 << n + m);
-
-    component n2b_small = Num2Bits(n);
-    n2b_small.in <== small;
-    component n2b_medium = Num2Bits(m);
-    n2b_medium.in <== medium;
-    component n2b_big = Num2Bits(k);
-    n2b_big.in <== big;
-
-    in === small + medium * (1 << n) + big * (1 << n + m);
+// large integer addition
+// given two large integers A and B
+// where A is an large integer of Na limbs
+// and B is an large integer of Nb limbs
+// compute A + B as an large integer of max(Na, Nb) limbs of size max(na, nb) + 1
+template BigAdd(Na, Nb) {
+    signal input a[Na];
+    signal input b[Nb];
+    signal output out[varmax(Na, Nb)];
+    for (var i = 0; i < varmin(Na, Nb); i++) {
+        out[i] <== a[i] + b[i];
+    }
+    if (Na > Nb) {
+        for (var i = Nb; i < Na; i++) {
+            out[i] <== a[i];
+        }
+    } else {
+        for (var i = Na; i < Nb; i++) {
+            out[i] <== b[i];
+        }
+    }
 }
 
-// a[i], b[i] in 0... 2**n-1
-// represent a = a[0] + a[1] * 2**n + .. + a[k - 1] * 2**(n * k)
-template BigAdd(n, k) {
-    assert(n <= 252);
-    signal input a[k];
-    signal input b[k];
-    signal output out[k + 1];
+// given large integer A with N limbs
+// convert to a normalized large integer (N + 1) limbs with n bits per limb
+// helper function, doesn't generate constraints
+function BigVarNormalize(N, n, A) {
+    var B[200]; // N + 1
+    var r = 0;
+    for (var i = 0; i < N; i++) {
+        B[i] = ((A[i] + r) % (2 ** n));
+        r = (A[i] + r) >> n;
+    }
+    B[N] = r;
+    return B;
+}
 
-    component unit0 = ModSum(n);
-    unit0.a <== a[0];
-    unit0.b <== b[0];
-    out[0] <== unit0.sum;
+// multiply two large integers A and B and normalize the result (carries)
+function BigVarMul(Na, Nb, a, b, n) {
+    var out[200]; // Na + Nb - 1
+    for (var i = 0; i < Na + Nb - 1; i++) {
+        out[i] = 0;
+    }
+    for (var i = 0; i < Na; i++) {
+        for (var j = 0; j < Nb; j++) {
+            out[i + j] = out[i + j] + a[i] * b[j];
+        }
+    }
+    return BigVarNormalize(Na + Nb - 1, n, out);
+}
 
-    component unit[k - 1];
-    for (var i = 1; i < k; i++) {
-        unit[i - 1] = ModSumThree(n);
-        unit[i - 1].a <== a[i];
-        unit[i - 1].b <== b[i];
-        if (i == 1) {
-            unit[i - 1].c <== unit0.carry;
+// large integer multiplication
+// given two large integers A and B
+// where A is an large integer of Na limbs
+// and B is an large integer of Nb limbs
+// compute A * B as an large integer of Na + Nb - 1 limbs
+template BigMul(Na, Nb) {
+    signal input a[Na];
+    signal input b[Nb];
+    signal output out[Na + Nb - 1];
+    var ab[Na + Nb - 1];
+    // first calculate C without constraints (polynomial multiplication)
+    for (var i = 0; i < Na + Nb - 1; i++) {
+        ab[i] = 0;
+    }
+    for (var i = 0; i < Na; i++) {
+        for (var j = 0; j < Nb; j++) {
+            ab[i + j] = ab[i + j] + a[i] * b[j];
+        }
+    }
+    for (var i = 0; i < Na + Nb - 1; i++) {
+        out[i] <-- ab[i];
+    }
+    // now add constraints to ensure that C is the correct result
+    var s_a[Na + Nb - 1]; // A as a polynomial evaluated at 0, 1, 2, ...
+    var s_b[Na + Nb - 1]; // B as a polynomial evaluated at 0, 1, 2, ...
+    var s_c[Na + Nb - 1]; // C as a polynomial evaluated at 0, 1, 2, ...
+    for (var i = 0; i < Na + Nb - 1; i++) {
+        s_a[i] = 0; s_b[i] = 0; s_c[i] = 0;
+        for (var j = 0; j < Na; j++) {
+            s_a[i] = s_a[i] + a[j] * (i ** j);
+        }
+        for (var j = 0; j < Nb; j++) {
+            s_b[i] = s_b[i] + b[j] * (i ** j);
+        }
+        for (var j = 0; j < Na + Nb - 1; j++) {
+            s_c[i] = s_c[i] + out[j] * (i ** j);
+        }
+        s_c[i] === s_a[i] * s_b[i];
+    }
+}
+
+// given large integers A and M (A potentially not normalized)
+// compute R = A % M and Q = A / M
+// where R is an large integer of Nm limbs
+// and Q is an large integer of Na - Nm + 1 limbs
+// does not generate constraints, just computes the result
+// TO DO, maybe turn this into a function instead of a template to avoid warnings
+template BigVarDiv(Na, Nm, n) {
+    signal input a[Na];
+    signal input mod[Nm];
+    signal output out[Nm];
+    signal output q[Na - Nm + 1];
+    var anorm[200] = BigVarNormalize(Na, n, a); // Na + 1
+    var r = 0;
+    for (var ii = 0; ii <= Na - Nm; ii++) {
+        var i = Na - Nm - ii;
+        // determine the ith limb of Q by binary search
+        // this could be swapped for something faster but its not the bottleneck
+        var l = 0;
+        var h = 2 ** n;
+        while (l + 1 < h) {
+            var m = (l + h) / 2;
+            var tmp[200] = BigVarMul(Nm, 1, mod, [m], n); // Nm + 1
+            // check if tmp <= anorm[i:]
+            var larger = 0;
+            var done = 0;
+            for (var jj = 0; jj <= Nm && done == 0; jj++) {
+                var j = Nm - jj;
+                if ((i + j > Na && tmp[j] > 0) ||
+                    (i + j <= Na && tmp[j] > anorm[i + j])) {
+                    larger = 1;
+                    done = 1;
+                } else if (i + j <= Na && tmp[j] < anorm[i + j]) {
+                    done = 1;
+                }
+            }
+            if (larger == 0) {
+                l = m;
+            } else {
+                h = m;
+            }
+        }
+        q[i] <-- l;
+        // subtract M * Q[i] from a slice of anorm
+        var tmp[200] = BigVarMul(Nm, 1, mod, [q[i]], n); // Nm + 1
+        for (var j = 0; j < Nm + 1 && i + j < Na + 1; j++) {
+            if (anorm[i + j] < tmp[j]) {
+                anorm[i + j] = anorm[i + j] + (2 ** n) - tmp[j];
+                tmp[j + 1] = tmp[j + 1] + 1;
+            } else {
+                anorm[i + j] = anorm[i + j] - tmp[j];
+            }
+        }
+    }
+    // copy the lower Nm limbs of anorm into R
+    for (var i = 0; i < Nm; i++) {
+        out[i] <-- anorm[i];
+    }
+}
+
+template BigLimbCheck(N, n) {
+    signal input a[N];
+    component isbits[N];
+    for (var i = 0; i < N; i++) {
+        isbits[i] = IsNBits(n);
+        isbits[i].val <== a[i];
+    }
+}
+
+// only use after a single multiplication, not generic!
+template BigEq(N, n) {
+    signal input a[N];
+    signal input b[N];
+    // get ceil log2 N
+    var logN = 0;
+    var tmp = N;
+    while (tmp > 0) {
+        logN++;
+        tmp >>= 1;
+    }
+    var k = ((253 - logN) \ n) - 1;
+    var l = ((N - 1) \ k);
+    signal Zero[l];
+    for (var i = 0; k * i < N; i++) {
+        var lc = 0;
+        if (i != 0) {
+            lc = Zero[i - 1];
+        }
+        for (var j = 0; j < k && k * i + j < N; j++) {
+            lc += (a[k * i + j] - b[k * i + j]) * (2 ** (n * j));
+        }
+        if (k * (i + 1) < N) {
+            Zero[i] <== lc / (2 ** (n * k));
         } else {
-            unit[i - 1].c <== unit[i - 2].carry;
-        }
-        out[i] <== unit[i - 1].sum;
-    }
-    out[k] <== unit[k - 2].carry;
-}
-
-// a and b have n-bit registers
-// a has ka registers, each with NONNEGATIVE ma-bit values (ma can be > n)
-// b has kb registers, each with NONNEGATIVE mb-bit values (mb can be > n)
-// out has ka + kb - 1 registers, each with (ma + mb + ceil(log(max(ka, kb))))-bit values
-template BigMultNoCarry(n, ma, mb, ka, kb) {
-    assert(ma + mb <= 253);
-    signal input a[ka];
-    signal input b[kb];
-    signal output out[ka + kb - 1];
-
-    var prod_val[ka + kb - 1];
-    for (var i = 0; i < ka + kb - 1; i++) {
-        prod_val[i] = 0;
-    }
-    for (var i = 0; i < ka; i++) {
-        for (var j = 0; j < kb; j++) {
-            prod_val[i + j] += a[i] * b[j];
+            lc === 0;
         }
     }
-    for (var i = 0; i < ka + kb - 1; i++) {
-        out[i] <-- prod_val[i];
-    }
-
-    var a_poly[ka + kb - 1];
-    var b_poly[ka + kb - 1];
-    var out_poly[ka + kb - 1];
-    for (var i = 0; i < ka + kb - 1; i++) {
-        out_poly[i] = 0;
-        a_poly[i] = 0;
-        b_poly[i] = 0;
-        for (var j = 0; j < ka + kb - 1; j++) {
-            out_poly[i] = out_poly[i] + out[j] * (i ** j);
-        }
-        for (var j = 0; j < ka; j++) {
-            a_poly[i] = a_poly[i] + a[j] * (i ** j);
-        }
-        for (var j = 0; j < kb; j++) {
-            b_poly[i] = b_poly[i] + b[j] * (i ** j);
-        }
-    }
-    for (var i = 0; i < ka + kb - 1; i++) {
-        out_poly[i] === a_poly[i] * b_poly[i];
+    component safe[l];
+    for (var i = 0; i < l; i++) {
+        safe[i] = IsSignedNBits(n + logN);
+        safe[i].val <== Zero[i];
     }
 }
 
+// given large integers A and M
+// where A is an large integer of Na limbs
+// and M is an large integer of Nm limbs
+// compute R = A % M with some flexibility in the size of C
+// namely R can be larger than M, but it must fit within Nm limbs of size n
+template BigRelaxMod(Na, Nm, n) {
+    signal input a[Na];
+    signal input mod[Nm];
+    signal output out[Nm];
+    signal q[Na - Nm + 1];
+    // A = Q * M + R
+    // first calculate Q and R without constraints via long division
+    component longDiv = BigVarDiv(Na, Nm, n);
+    longDiv.a <== a;
+    longDiv.mod <== mod;
+    q <== longDiv.q;
+    out <== longDiv.out;
+    // check that A = Q * M + R
+    component mul = BigMul(Na - Nm + 1, Nm);
+    mul.a <== q;
+    mul.b <== mod;
+    component add = BigAdd(Na, Nm);
+    add.a <== mul.out;
+    add.b <== out;
+    // check equality
+    component eq = BigEq(Na, n);
+    eq.a <== add.out;
+    eq.b <== a;
+    // check that R fits in Nm limbs of with n bits each
+    component limbCheckR = BigLimbCheck(Nm, n);
+    limbCheckR.a <== out;
+    // check that Q fits in Na - Nm + 1 limbs of with n bits each
+    component limbCheckQ = BigLimbCheck(Na - Nm + 1, n);
+    limbCheckQ.a <== q;
+}
 
-// in[i] contains longs
-// out[i] contains shorts
-template LongToShortNoEndCarry(n, k) {
-    assert(n <= 126);
-    signal input in[k];
-    signal output out[k+1];
+template BigModMul(N, n) {
+    signal input a[N];
+    signal input b[N];
+    signal input mod[N];
+    signal output out[N];
+    component mul = BigMul(N, N);
+    mul.a <== a;
+    mul.b <== b;
+    component bigMod = BigRelaxMod(N + N - 1, N, n);
+    bigMod.a <== mul.out;
+    bigMod.mod <== mod;
+    out <== bigMod.out;
+}
 
-    var split[k][3];
-    for (var i = 0; i < k; i++) {
-        split[i] = SplitThreeFn(in[i], n, n, n);
+template BigMux() {
+    // Inputs
+    signal input a;      // First limb
+    signal input b;      // Second limb
+    signal input sel;    // Selector bit (0 or 1)
+
+    // Output
+    signal output out;   // Output limb
+
+    // Constraint to ensure 'sel' is a valid bit (0 or 1)
+    sel * (sel - 1) === 0;
+
+    // Mux Logic: C = A + sel * (B - A)
+    out <== a + sel * (b - a);
+}
+
+// Large integer modular exponentiation
+// Given a large integer A and modulus M, both as arrays of N limbs of size n
+// Compute A^e mod M for some integer e (input as a signal), where e is up to K bits
+template BigModExp(N, n, K) {
+    // Inputs
+    signal input base[N];          // Base (N limbs)
+    signal input mod[N];          // Modulus (N limbs)
+    signal input exp;             // Exponent (single limb for simplicity)
+    signal output out[N];         // Result (N limbs)
+
+    // Step 1: Convert the exponent to bits
+    component bitsizer = Num2Bits(K);
+    bitsizer.in <== exp;
+    signal e_bits[K];
+    for (var i = 0; i < K; i++) {
+        e_bits[i] <== bitsizer.out[i];
     }
 
-    var carry[k];
-    carry[0] = 0;
-    out[0] <-- split[0][0];
-    if (k == 1) {
-	out[1] <-- split[0][1];
+    // Step 2: Initialize R and currentA at iteration 0
+    signal R[K+1][N];
+    signal currentA[K+1][N];
+
+    for (var j = 0; j < N; j++) {
+        R[0][j] <== (j == 0) ? 1 : 0;    // R[0] = 1 represented in limbs
+        currentA[0][j] <== base[j];      // currentA[0] = base
     }
-    if (k > 1) {
-        var sumAndCarry[2] = SplitFn(split[0][1] + split[1][0], n, n);
-        out[1] <-- sumAndCarry[0];
-        carry[1] = sumAndCarry[1];
-    }
-    if (k == 2) {
-	out[2] <-- split[1][1] + split[0][2] + carry[1];
-    }
-    if (k > 2) {
-        for (var i = 2; i < k; i++) {
-            var sumAndCarry[2] = SplitFn(split[i][0] + split[i-1][1] + split[i-2][2] + carry[i-1], n, n);
-            out[i] <-- sumAndCarry[0];
-            carry[i] = sumAndCarry[1];
+
+    // Step 3: Pre-declare all required components
+    component modmul[2 * K];
+    component muxes[K][N];    // One BigMux1 per bit per limb
+
+    // Step 4: Iterate over each bit of the exponent
+    for (var i = 0; i < K; i++) {
+        // 4.1: Conditional Multiplication: R[i+1] = E_bits[i] ? (R[i] * currentA[i] mod M) : R[i]
+        modmul[2 * i] = BigModMul(N, n);
+        modmul[2 * i].a <== R[i];
+        modmul[2 * i].b <== currentA[i];
+        modmul[2 * i].mod <== mod;
+
+        // 4.2: Use BigMux1 to select between R[i] and modmul[2*i].C for each limb
+        for (var j = 0; j < N; j++) {
+            muxes[i][j] = BigMux();
+            muxes[i][j].a <== R[i][j];
+            muxes[i][j].b <== modmul[2 * i].out[j];
+            muxes[i][j].sel <== e_bits[i];
+            R[i + 1][j] <== muxes[i][j].out;
         }
-        out[k] <-- split[k-1][1] + split[k-2][2] + carry[k-1];
-    }
 
-    component outRangeChecks[k+1];
-    for (var i = 0; i < k+1; i++) {
-        outRangeChecks[i] = Num2Bits(n);
-        outRangeChecks[i].in <== out[i];
-    }
+        // 4.3: Square the base: currentA[i+1] = (currentA[i] * currentA[i]) mod M
+        modmul[2 * i + 1] = BigModMul(N, n);
+        modmul[2 * i + 1].a <== currentA[i];
+        modmul[2 * i + 1].b <== currentA[i];
+        modmul[2 * i + 1].mod <== mod;
 
-    signal runningCarry[k];
-    component runningCarryRangeChecks[k];
-    runningCarry[0] <-- (in[0] - out[0]) / (1 << n);
-    runningCarryRangeChecks[0] = Num2Bits(n + log_ceil(k));
-    runningCarryRangeChecks[0].in <== runningCarry[0];
-    runningCarry[0] * (1 << n) === in[0] - out[0];
-    for (var i = 1; i < k; i++) {
-        runningCarry[i] <-- (in[i] - out[i] + runningCarry[i-1]) / (1 << n);
-        runningCarryRangeChecks[i] = Num2Bits(n + log_ceil(k));
-        runningCarryRangeChecks[i].in <== runningCarry[i];
-        runningCarry[i] * (1 << n) === in[i] - out[i] + runningCarry[i-1];
-    }
-    runningCarry[k-1] === out[k];
-}
-
-template BigMult(n, k) {
-    signal input a[k];
-    signal input b[k];
-    signal output out[2 * k];
-
-    component mult = BigMultNoCarry(n, n, n, k, k);
-    for (var i = 0; i < k; i++) {
-        mult.a[i] <== a[i];
-        mult.b[i] <== b[i];
-    }
-
-    // no carry is possible in the highest order register
-    component longshort = LongToShortNoEndCarry(n, 2 * k - 1);
-    for (var i = 0; i < 2 * k - 1; i++) {
-        longshort.in[i] <== mult.out[i];
-    }
-    for (var i = 0; i < 2 * k; i++) {
-        out[i] <== longshort.out[i];
-    }
-}
-
-template BigLessThan(n, k){
-    signal input a[k];
-    signal input b[k];
-    signal output out;
-
-    component lt[k];
-    component eq[k];
-    for (var i = 0; i < k; i++) {
-        lt[i] = LessThan(n);
-        lt[i].in[0] <== a[i];
-        lt[i].in[1] <== b[i];
-        eq[i] = IsEqual();
-        eq[i].in[0] <== a[i];
-        eq[i].in[1] <== b[i];
-    }
-
-    // ors[i] holds (lt[k - 1] || (eq[k - 1] && lt[k - 2]) .. || (eq[k - 1] && .. && lt[i]))
-    // ands[i] holds (eq[k - 1] && .. && lt[i])
-    // eq_ands[i] holds (eq[k - 1] && .. && eq[i])
-    component ors[k - 1];
-    component ands[k - 1];
-    component eq_ands[k - 1];
-    for (var i = k - 2; i >= 0; i--) {
-        ands[i] = AND();
-        eq_ands[i] = AND();
-        ors[i] = OR();
-
-        if (i == k - 2) {
-            ands[i].a <== eq[k - 1].out;
-            ands[i].b <== lt[k - 2].out;
-            eq_ands[i].a <== eq[k - 1].out;
-            eq_ands[i].b <== eq[k - 2].out;
-            ors[i].a <== lt[k - 1].out;
-            ors[i].b <== ands[i].out;
-        } else {
-            ands[i].a <== eq_ands[i + 1].out;
-            ands[i].b <== lt[i].out;
-            eq_ands[i].a <== eq_ands[i + 1].out;
-            eq_ands[i].b <== eq[i].out;
-            ors[i].a <== ors[i + 1].out;
-            ors[i].b <== ands[i].out;
-        }
-    }
-    out <== ors[0].out;
-}
-
-template BigIsEqual(k){
-    signal input in[2][k];
-    signal output out;
-    component isEqual[k+1];
-    var sum = 0;
-    for(var i = 0; i < k; i++){
-        isEqual[i] = IsEqual();
-        isEqual[i].in[0] <== in[0][i];
-        isEqual[i].in[1] <== in[1][i];
-        sum = sum + isEqual[i].out;
-    }
-
-    isEqual[k] = IsEqual();
-    isEqual[k].in[0] <== sum;
-    isEqual[k].in[1] <== k;
-    out <== isEqual[k].out;
-}
-
-// leading register of b should be non-zero
-template BigMod(n, k) {
-    assert(n <= 126);
-    signal input a[2 * k];
-    signal input b[k];
-
-    signal output div[k + 1];
-    signal output mod[k];
-
-    var longdiv[2][100] = long_div(n, k, k, a, b);
-    for (var i = 0; i < k; i++) {
-        div[i] <-- longdiv[0][i];
-        mod[i] <-- longdiv[1][i];
-    }
-    div[k] <-- longdiv[0][k];
-    component div_range_checks[k + 1];
-    for (var i = 0; i <= k; i++) {
-        div_range_checks[i] = Num2Bits(n);
-        div_range_checks[i].in <== div[i];
-    }
-    component mod_range_checks[k];
-    for (var i = 0; i < k; i++) {
-        mod_range_checks[i] = Num2Bits(n);
-        mod_range_checks[i].in <== mod[i];
-    }
-
-    component mul = BigMult(n, k + 1);
-    for (var i = 0; i < k; i++) {
-        mul.a[i] <== div[i];
-        mul.b[i] <== b[i];
-    }
-    mul.a[k] <== div[k];
-    mul.b[k] <== 0;
-
-    component add = BigAdd(n, 2 * k + 2);
-    for (var i = 0; i < 2 * k; i++) {
-        add.a[i] <== mul.out[i];
-        if (i < k) {
-            add.b[i] <== mod[i];
-        } else {
-            add.b[i] <== 0;
+        for (var j = 0; j < N; j++) {
+            currentA[i + 1][j] <== modmul[2 * i + 1].out[j];
         }
     }
-    add.a[2 * k] <== mul.out[2 * k];
-    add.a[2 * k + 1] <== mul.out[2 * k + 1];
-    add.b[2 * k] <== 0;
-    add.b[2 * k + 1] <== 0;
 
-    for (var i = 0; i < 2 * k; i++) {
-        add.out[i] === a[i];
+    // Step 5: Assign the final result
+    for (var j = 0; j < N; j++) {
+        out[j] <== R[K][j];
     }
-    add.out[2 * k] === 0;
-    add.out[2 * k + 1] === 0;
-
-    component lt = BigLessThan(n, k);
-    for (var i = 0; i < k; i++) {
-        lt.a[i] <== mod[i];
-        lt.b[i] <== b[i];
-    }
-    lt.out === 1;
-}
-
-// a[i], b[i] in 0... 2**n-1
-// represent a = a[0] + a[1] * 2**n + .. + a[k - 1] * 2**(n * k)
-// assume a >= b
-template BigSub(n, k) {
-    assert(n <= 252);
-    signal input a[k];
-    signal input b[k];
-    signal output out[k];
-    signal output underflow;
-
-    component unit0 = ModSub(n);
-    unit0.a <== a[0];
-    unit0.b <== b[0];
-    out[0] <== unit0.out;
-
-    component unit[k - 1];
-    for (var i = 1; i < k; i++) {
-        unit[i - 1] = ModSubThree(n);
-        unit[i - 1].a <== a[i];
-        unit[i - 1].b <== b[i];
-        if (i == 1) {
-            unit[i - 1].c <== unit0.borrow;
-        } else {
-            unit[i - 1].c <== unit[i - 2].borrow;
-        }
-        out[i] <== unit[i - 1].out;
-    }
-    underflow <== unit[k - 2].borrow;
-}
-
-// calculates (a - b) % p, where a, b < p
-// note: does not assume a >= b
-template BigSubModP(n, k){
-    assert(n <= 252);
-    signal input a[k];
-    signal input b[k];
-    signal input p[k];
-    signal output out[k];
-    component sub = BigSub(n, k);
-    for (var i = 0; i < k; i++){
-        sub.a[i] <== a[i];
-        sub.b[i] <== b[i];
-    }
-    signal flag;
-    flag <== sub.underflow;
-    component add = BigAdd(n, k);
-    for (var i = 0; i < k; i++){
-        add.a[i] <== sub.out[i];
-        add.b[i] <== p[i];
-    }
-    signal tmp[k];
-    for (var i = 0; i < k; i++){
-        tmp[i] <== (1 - flag) * sub.out[i];
-        out[i] <== tmp[i] + flag * add.out[i];
-    }
-}
-
-template BigMultModP(n, k) {
-    assert(n <= 252);
-    signal input a[k];
-    signal input b[k];
-    signal input p[k];
-    signal output out[k];
-
-    component big_mult = BigMult(n, k);
-    for (var i = 0; i < k; i++) {
-        big_mult.a[i] <== a[i];
-        big_mult.b[i] <== b[i];
-    }
-    component big_mod = BigMod(n, k);
-    for (var i = 0; i < 2 * k; i++) {
-        big_mod.a[i] <== big_mult.out[i];
-    }
-    for (var i = 0; i < k; i++) {
-        big_mod.b[i] <== p[i];
-    }
-    for (var i = 0; i < k; i++) {
-        out[i] <== big_mod.mod[i];
-    }
-}
-
-template BigModInv(n, k) {
-    assert(n <= 252);
-    signal input in[k];
-    signal input p[k];
-    signal output out[k];
-
-    // length k
-    var inv[100] = mod_inv(n, k, in, p);
-    for (var i = 0; i < k; i++) {
-        out[i] <-- inv[i];
-    }
-    component range_checks[k];
-    for (var i = 0; i < k; i++) {
-        range_checks[i] = Num2Bits(n);
-        range_checks[i].in <== out[i];
-    }
-
-    component mult = BigMult(n, k);
-    for (var i = 0; i < k; i++) {
-        mult.a[i] <== in[i];
-        mult.b[i] <== out[i];
-    }
-    component mod = BigMod(n, k);
-    for (var i = 0; i < 2 * k; i++) {
-        mod.a[i] <== mult.out[i];
-    }
-    for (var i = 0; i < k; i++) {
-        mod.b[i] <== p[i];
-    }
-    mod.mod[0] === 1;
-    for (var i = 1; i < k; i++) {
-        mod.mod[i] === 0;
-    }
-}
-
-// in[i] contains values in the range -2^(m-1) to 2^(m-1)
-// constrain that in[] as a big integer is zero
-// each limbs is n bits
-template CheckCarryToZero(n, m, k) {
-    assert(k >= 2);
-    
-    var EPSILON = 3;
-    
-    signal input in[k];
-    
-    signal carry[k];
-    component carryRangeChecks[k];
-    for (var i = 0; i < k-1; i++){
-        carryRangeChecks[i] = Num2Bits(m + EPSILON - n); 
-        if( i == 0 ){
-            carry[i] <-- in[i] / (1<<n);
-            in[i] === carry[i] * (1<<n);
-        }
-        else{
-            carry[i] <-- (in[i]+carry[i-1]) / (1<<n);
-            in[i] + carry[i-1] === carry[i] * (1<<n);
-        }
-        // checking carry is in the range of - 2^(m-n-1+eps), 2^(m+-n-1+eps)
-        carryRangeChecks[i].in <== carry[i] + ( 1<< (m + EPSILON - n - 1));
-    }
-    in[k-1] + carry[k-2] === 0;   
 }

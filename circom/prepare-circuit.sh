@@ -43,9 +43,6 @@ if [ ! command -v snarkjs &> /dev/null ]; then
     npm install -g snarkjs
 fi
 
-# install circomlib
-npm install circomlib
-
 # compile the circuit
 circom $CIRCUIT --r1cs --wasm --sym -o $ARTIFACTS_DIR
 
@@ -56,11 +53,15 @@ if [ ! -f "$ARTIFACTS_DIR/ptau" ]; then
 fi
 
 # generate the trusted setup
-R1CS=$ARTIFACTS_DIR/$(basename $CIRCUIT .circom).r1cs
-snarkjs groth16 setup $R1CS $ARTIFACTS_DIR/ptau $ARTIFACTS_DIR/proving_key.zkey
+NAME=$(basename $CIRCUIT .circom)
+R1CS=$ARTIFACTS_DIR/$NAME.r1cs
+snarkjs groth16 setup $R1CS $ARTIFACTS_DIR/ptau $ARTIFACTS_DIR/$NAME\_pkey.zkey
 
 # export the verification key
-snarkjs zkey export verificationkey $ARTIFACTS_DIR/proving_key.zkey $ARTIFACTS_DIR/verification_key.json
+snarkjs zkey export verificationkey $ARTIFACTS_DIR/$NAME\_pkey.zkey $ARTIFACTS_DIR/$NAME\_vkey.json
+
+# mv wasm from $ARTIFACTS/$NAME_js/$NAME.wasm to $ARTIFACTS/$NAME.wasm
+mv $ARTIFACTS_DIR/$NAME\_js/$NAME.wasm $ARTIFACTS_DIR/$NAME.wasm
 
 # clean up
-rm -rf ./node_modules package-lock.json package.json
+rm -rf ./node_modules package-lock.json package.json $ARTIFACTS_DIR/$NAME\_js
