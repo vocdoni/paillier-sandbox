@@ -11,11 +11,15 @@ import (
 
 func TestPaillierCipher(t *testing.T) {
 	var (
+		// paillier parameters
 		bitSize = 64
 		s       = uint8(1)
 		l       = uint8(5) // number of shares
 		k       = uint8(3) // threshold
-
+		// circuit parameters
+		lSize  = 32
+		nLimbs = 16
+		// circuit assets
 		wasmFile = "./artifacts/paillier_cipher_test.wasm"
 		zkeyFile = "./artifacts/paillier_cipher_test_pkey.zkey"
 	)
@@ -44,14 +48,14 @@ func TestPaillierCipher(t *testing.T) {
 	// init inputs
 	inputs := map[string]any{
 		"m":               raw.String(),
-		"n_plus_one":      bigIntArrayToStringArray(bigIntToArray(32, 16, cv.NPlusOne)),
-		"r_to_n_to_s":     bigIntArrayToStringArray(bigIntToArray(32, 16, rToNToS)),
-		"n_to_s_plus_one": bigIntArrayToStringArray(bigIntToArray(32, 16, cv.NToSPlusOne)),
-		"ciphertext":      bigIntArrayToStringArray(bigIntToArray(32, 16, c)),
+		"n_plus_one":      BigIntArrayToStringArray(BigIntToArray(lSize, nLimbs, cv.NPlusOne)),
+		"r_to_n_to_s":     BigIntArrayToStringArray(BigIntToArray(lSize, nLimbs, rToNToS)),
+		"n_to_s_plus_one": BigIntArrayToStringArray(BigIntToArray(lSize, nLimbs, cv.NToSPlusOne)),
+		"ciphertext":      BigIntArrayToStringArray(BigIntToArray(lSize, nLimbs, c)),
 	}
 	bInputs, _ := json.Marshal(inputs)
 	log.Println("Inputs:", string(bInputs))
-	proofData, pubSignals, err := compileAndGenerateProof(bInputs, wasmFile, zkeyFile)
+	proofData, pubSignals, err := CompileAndGenerateProof(bInputs, wasmFile, zkeyFile)
 	if err != nil {
 		t.Errorf("Error compiling and generating proof: %v\n", err)
 		return

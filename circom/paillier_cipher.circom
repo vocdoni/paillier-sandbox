@@ -1,6 +1,6 @@
 pragma circom 2.1.0;
 
-include "./bigint.circom";
+include "./lib/bigint.circom";
 
 template EncryptWithPaillier(l_size, n_limbs) {
     // E(m, r) = g^m * r^n^s mod n^s+1
