@@ -7,8 +7,8 @@ import (
 
 func TestBallotProtocol(t *testing.T) {
 	// circuit files
-	wasmFile := "./artifacts/ballot_protocol_test.wasm"
-	zkeyFile := "./artifacts/ballot_protocol_test_pkey.zkey"
+	wasmFile := "./artifacts/ballot_protocol.wasm"
+	zkeyFile := "./artifacts/ballot_protocol_pkey.zkey"
 	// init inputs
 	inputs := map[string]any{
 		"fields":           []string{"1", "2", "3", "0", "0"}, // total_cost = 1^2 + 2^2 + 3^2 = 14

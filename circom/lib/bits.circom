@@ -14,6 +14,17 @@ template Num2Bits(n) {
     lc === in;
 }
 
+template Num2Bits_unsafe(n) {
+    signal input in;
+    signal output out[n];
+    var e = 1;
+    for (var i = 0; i < n; i++) {
+        out[i] <-- (in >> i) & 1;
+        out[i] * (1 - out[i]) === 0;
+        e *= 2;
+    }
+}
+
 template IsNBits(n) {
     signal input in;
     signal bits[n];

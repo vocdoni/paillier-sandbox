@@ -20,8 +20,8 @@ func TestPaillierCipher(t *testing.T) {
 		lSize  = 32
 		nLimbs = 16
 		// circuit assets
-		wasmFile = "./artifacts/paillier_cipher_test.wasm"
-		zkeyFile = "./artifacts/paillier_cipher_test_pkey.zkey"
+		wasmFile = "./artifacts/paillier_cipher.wasm"
+		zkeyFile = "./artifacts/paillier_cipher_pkey.zkey"
 	)
 	// generate the public key
 	_, pk, err := tcpaillier.NewKey(bitSize, s, l, k)

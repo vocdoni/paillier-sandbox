@@ -30,3 +30,5 @@ template EncryptWithPaillier(l_size, n_limbs) {
         mulMod.out[i] === ciphertext[i];
     }
 }
+
+component main {public [ciphertext, n_plus_one, n_to_s_plus_one]} = EncryptWithPaillier(32, 16);

@@ -46,3 +46,5 @@ template BallotProtocol(n_fields) {
     gt.in[1] <== min_total_cost;
     gt.out === 1;
 }
+
+component main = BallotProtocol(5);

@@ -21,7 +21,7 @@ For `l_size = 32` and `n_limbs = 16`.
 ### Inputs
 
 | Name | Pub/Priv | Type | Description |
-|:---:|:---:|:---:|:---:|
+|:---:|:---:|:---:|:---|
 | ciphertext | `Pub` | `[]int` | The result of cipher `m` |
 | m | `Priv` | `int` |  The raw message |
 | n_plus_one | `Pub` | `[]int` | `g` component |
@@ -36,7 +36,7 @@ For `l_size = 32` and `n_limbs = 16`.
 ### Test
 
 ```bash
-sh prepare-circuit.sh paillier_cipher_test.circom
+sh prepare-circuit.sh paillier_cipher.circom
 go test -timeout 30s -run ^TestPaillierCipher$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
 ```
 
@@ -62,7 +62,7 @@ For `n_fields = 5`.
 ### Inputs
 
 | Name | Pub/Priv | Type | Description |
-|:---:|:---:|:---:|:---:|
+|:---:|:---:|:---:|:---|
 | fields | `Priv` | `[]int` | Each position of the array contains an answer to one of the process' fields. |
 | max_count | `Priv` | `int` | The number of valid values of *fields*. Must be lower or equal to `n_fields` parameter. |
 | force_uniqueness | `Priv` | `int` | Choices for a question cannot appear twice or more |
@@ -79,6 +79,49 @@ For `n_fields = 5`.
 ### Test
 
 ```bash
-sh prepare-circuit.sh ballot_protocol_test.circom
+sh prepare-circuit.sh ballot_protocol.circom
 go test -timeout 30s -run ^TestBallotProtocol$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
+```
+
+## Ballot encoder
+
+The encoding is done by the sum of every field multiplied by the power of the base and the position of the field. 
+
+Ex.:
+```
+fields   = [5, 1, 4, 3, 0, 0, 0]
+mask     = [1, 1, 1, 1, 0, 0, 0]
+base     = 100
+out      = 5 * 100^3 + 1 * 100^2 + 4 * 100^1 + 3 * 100^0 = 5010403
+```
+
+```
+template instances: 6
+non-linear constraints: 7070
+linear constraints: 0
+public inputs: 0
+private inputs: 15
+public outputs: 1
+wires: 7086
+labels: 8945
+```
+For `n_fields = 7`.
+
+### Inputs
+
+| Name | Pub/Priv | Type | Description |
+|:---:|:---:|:---:|:---|
+| fields | `Priv` | `[]int` | Ballot protocol fields |
+| mask | `Priv` | `[]int` | A list of bits indicating which positions contain a valid field. |
+| base | `Priv` | `int` | To be used as the base of the power to encode each field. |
+
+### Parameters
+
+* `n_fields`: The number of `fields` items.
+
+### Test
+
+```bash
+sh prepare-circuit.sh ballot_encoder.circom
+go test -timeout 30s -run ^TestBallotEncoder$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
 ```
