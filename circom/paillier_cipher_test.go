@@ -5,46 +5,27 @@ import (
 	"log"
 	"math/big"
 	"testing"
-
-	"github.com/niclabs/tcpaillier"
 )
 
 func TestPaillierCipher(t *testing.T) {
 	var (
-		// paillier parameters
-		bitSize = 64
-		s       = uint8(1)
-		l       = uint8(5) // number of shares
-		k       = uint8(3) // threshold
 		// circuit parameters
 		lSize  = 32
 		nLimbs = 16
 		// circuit assets
-		wasmFile = "./artifacts/paillier_cipher.wasm"
-		zkeyFile = "./artifacts/paillier_cipher_pkey.zkey"
+		wasmFile = "./artifacts/paillier_cipher_test.wasm"
+		zkeyFile = "./artifacts/paillier_cipher_test_pkey.zkey"
 	)
-	// generate the public key
-	_, pk, err := tcpaillier.NewKey(bitSize, s, l, k)
-	if err != nil {
-		log.Fatalf("Error generating key: %v\n", err)
-		return
-	}
-	// get a random mod
-	randMod, err := pk.RandomModNToSPlusOneStar()
-	if err != nil {
-		log.Fatalf("Error generating random mod: %v\n", err)
-		return
-	}
-	// encrypt with r
-	raw := big.NewInt(255)
-	c, err := pk.EncryptFixed(raw, randMod)
+	// encrypt
+	raw, _ := new(big.Int).SetString("102030405", 10)
+	pk, rnd, c, err := EncryptWithPaillier(raw)
 	if err != nil {
 		log.Fatalf("Error encrypting: %v\n", err)
 		return
 	}
 	// get the cached constant values
 	cv := pk.Cache()
-	rToNToS := new(big.Int).Exp(randMod, cv.NToS, cv.NToSPlusOne)
+	rToNToS := new(big.Int).Exp(rnd, cv.NToS, cv.NToSPlusOne)
 	// init inputs
 	inputs := map[string]any{
 		"m":               raw.String(),

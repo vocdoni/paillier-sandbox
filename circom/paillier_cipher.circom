@@ -14,7 +14,7 @@ template EncryptWithPaillier(l_size, n_limbs) {
     signal input ciphertext[n_limbs];
 
     // compute g^m mod n^s+1 
-    component powMod = BigModExp(n_limbs, l_size, 17);
+    component powMod = BigModExp(n_limbs, l_size, 252);
     powMod.base <== n_plus_one;
     powMod.exp <== m;
     powMod.mod <== n_to_s_plus_one;
@@ -30,5 +30,3 @@ template EncryptWithPaillier(l_size, n_limbs) {
         mulMod.out[i] === ciphertext[i];
     }
 }
-
-component main {public [ciphertext, n_plus_one, n_to_s_plus_one]} = EncryptWithPaillier(32, 16);

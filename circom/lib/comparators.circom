@@ -2,6 +2,19 @@ pragma circom 2.1.0;
 
 include "./bits.circom";
 
+template Mux() {
+    signal input a;
+    signal input b;
+    signal input sel;
+    signal output out;
+    // constraint to ensure 'sel' is a valid bit (0 or 1)
+    sel * (sel - 1) === 0;
+    // mux Logic: C = A + sel * (B - A)
+    //  - if sel = 0, C = A
+    //  - if sel = 1, C = B
+    out <== a + sel * (b - a);
+}
+
 template IsZero() {
     signal input in;
     signal output out;

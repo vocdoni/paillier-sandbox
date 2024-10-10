@@ -30,8 +30,7 @@ template BallotEncoder(n_fields) {
         exp_diff[i+1] <== iseq[i].out + exp_diff[i];
     }
     assert(exp_diff[n_fields] >= 0);
-    var exp = n_fields - exp_diff[n_fields];
-
+    var exp = exp_diff[n_fields] - 1;
     signal powers[n_fields];
     component pow[n_fields];
     component n2b[n_fields];
@@ -52,5 +51,3 @@ template BallotEncoder(n_fields) {
     sum.mask <== mask;
     out <== sum.out;
 }
-
-component main = BallotEncoder(7);

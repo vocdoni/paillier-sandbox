@@ -4,6 +4,13 @@
 
 > E(m, r) = g^m * r^n^s mod n^s+1
 
+The public key used in a proof can be verified checking the public inputs `g = n + 1` and `n^s+1` with `s = 1`:
+
+```
+g - 1 === √(n^s+1) === expected_n
+
+with s = 1
+```
 
 ```
 template instances: 13
@@ -36,7 +43,7 @@ For `l_size = 32` and `n_limbs = 16`.
 ### Test
 
 ```bash
-sh prepare-circuit.sh paillier_cipher.circom
+sh prepare-circuit.sh paillier_cipher_test.circom
 go test -timeout 30s -run ^TestPaillierCipher$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
 ```
 
@@ -71,6 +78,8 @@ For `n_fields = 5`.
 | max_total_cost | `Priv` | `int` | Maximum limit on the total sum of all ballot fields' values. |
 | min_total_cost | `Priv` | `int` | Minimum limit on the total sum of all ballot fields' values. |
 | cost_exp | `Priv` | `int` | The exponent that will be used to compute the "cost" of the field values. |
+| cost_from_weight | `Priv` | `int` | Bit to select if the circuit should use *max_total_cost* or *weight* as *total_cost* bound. |
+| weight | `Priv` | `int` | The voter assigned ballot weight |
 
 ### Parameters
 
@@ -79,7 +88,7 @@ For `n_fields = 5`.
 ### Test
 
 ```bash
-sh prepare-circuit.sh ballot_protocol.circom
+sh prepare-circuit.sh ballot_protocol_test.circom
 go test -timeout 30s -run ^TestBallotProtocol$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
 ```
 
@@ -122,6 +131,56 @@ For `n_fields = 7`.
 ### Test
 
 ```bash
-sh prepare-circuit.sh ballot_encoder.circom
+sh prepare-circuit.sh ballot_encoder_test.circom
 go test -timeout 30s -run ^TestBallotEncoder$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
+```
+
+## VocdoniZ circuit
+
+VocdoniZ is the circuit to prove a valid vote in the Vocdoni scheme. The vote is valid if it meets the Ballot Protocol requirements, but also if the encrypted vote provided matches with the raw vote encrypted in this circuit.
+The circuit checks the the vote over the params provided using the BallotProtocol template, encodes the vote using the BallotEncoder template and compares the result with the encrypted vote.
+
+```
+template instances: 33
+non-linear constraints: 675069
+linear constraints: 0
+public inputs: 72
+private inputs: 12
+public outputs: 0
+wires: 667975
+labels: 948750
+```
+For `n_fields = 10`, `l_size = 32` and `n_limbs = 16`.
+
+### Inputs
+
+| Name | Pub/Priv | Type | Description |
+|:---:|:---:|:---:|:---|
+| fields | `Priv` | `[]int` | Each position of the array contains an answer to one of the process' fields. |
+| max_count | `Pub` | `int` | The number of valid values of *fields*. Must be lower or equal to `n_fields` parameter. |
+| force_uniqueness | `Pub` | `int` | Choices for a question cannot appear twice or more |
+| max_value | `Pub` | `int` |  Determines the acceptable maximum value for all fields. |
+| min_value | `Pub` | `int` | Determines the acceptable minimum value for all fields. |
+| max_total_cost | `Pub` | `int` | Maximum limit on the total sum of all ballot fields' values. |
+| min_total_cost | `Pub` | `int` | Minimum limit on the total sum of all ballot fields' values. |
+| cost_exp | `Pub` | `int` | The exponent that will be used to compute the "cost" of the field values. |
+| cost_from_weight | `Pub` | `int` | Bit to select if the circuit should use *max_total_cost* or *weight* as *total_cost* bound. |
+| weight | `Pub` | `int` | The voter assigned ballot weight |
+| base | `Pub` | `int` | To be used as the base of the power to encode each field. |
+| ciphertext | `Pub` | `[]int` | The result of cipher the encoded ballot. |
+| n_plus_one | `Pub` | `[]int` | `g` component |
+| r_to_n_to_s | `Priv` | `[]int` | `n^r^s mod n^s+1` component precalculated |
+| n_to_s_plus_one | `Pub` | `[]int` | `n^s+1` component precalculated |
+
+### Parameters
+
+* `n_fields`: The number of `fields` items.
+* `l_size`: Size of each limb (bigints chunks).
+* `n_limbs`: Number of limbs.
+
+### Test
+
+```bash
+sh prepare-circuit.sh vocdoni_z.circom
+go test -timeout 3m -run ^TestVocdoniZ$ github.com/vocdoni/paillier-sandbox/circom -v -count=1
 ```

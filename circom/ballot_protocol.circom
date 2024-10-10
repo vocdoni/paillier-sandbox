@@ -13,8 +13,10 @@ template BallotProtocol(n_fields) {
     signal input max_total_cost;
     signal input min_total_cost;
     signal input cost_exp;
-    // generate a mask of valid fields
-    signal mask[n_fields];
+    signal input cost_from_weight;
+    signal input weight;
+    // return the mask of valid fields to be used in other components
+    signal output mask[n_fields];
     component mask_gen = MaskGenerator(n_fields);
     mask_gen.in <== max_count;
     mask <== mask_gen.out;
@@ -31,20 +33,26 @@ template BallotProtocol(n_fields) {
     inBounds.max <== max_value;
     // compute total cost: sum of all fields to the power of cost_exp
     signal total_cost;
-    component sum_calc = SumPow(n_fields, 252);
+    component sum_calc = SumPow(n_fields, 128);
     sum_calc.inputs <== fields;
     sum_calc.mask <== mask;
     sum_calc.exp <== cost_exp;
     total_cost <== sum_calc.out;
-    // check bounds
-    component lt = LessThan(252);
+    // select max_total_cost if cost_from_weight is 0, otherwise use weight
+    component mux = Mux();
+    mux.a <== max_total_cost;
+    mux.b <== weight;
+    mux.sel <== cost_from_weight;
+    // check bounds of total_cost with min_total_cost and mux output
+    component lt = LessThan(128);
     lt.in[0] <== total_cost;
-    lt.in[1] <== max_total_cost;
+    lt.in[1] <== mux.out;
     lt.out === 1;
-    component gt = GreaterThan(252);
-    gt.in[0] <== total_cost;
-    gt.in[1] <== min_total_cost;
+    // encrease by 1 the total_cost to allow equality with min_total_cost and 
+    // avoid negative overflow decreasing min_total_cost
+    component gt = GreaterThan(128);
+    gt.in[0] <== total_cost + 1;
+    gt.in[1] <== min_total_cost; 
     gt.out === 1;
 }
 
-component main = BallotProtocol(5);

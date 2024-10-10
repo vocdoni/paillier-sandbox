@@ -1,6 +1,7 @@
 pragma circom 2.0.0;
 
 include "bits.circom";
+include "comparators.circom";
 
 function varmax(a, b) {
     if (a > b) {
@@ -263,22 +264,6 @@ template BigModMul(N, n) {
     out <== bigMod.out;
 }
 
-template BigMux() {
-    // Inputs
-    signal input a;      // First limb
-    signal input b;      // Second limb
-    signal input sel;    // Selector bit (0 or 1)
-
-    // Output
-    signal output out;   // Output limb
-
-    // Constraint to ensure 'sel' is a valid bit (0 or 1)
-    sel * (sel - 1) === 0;
-
-    // Mux Logic: C = A + sel * (B - A)
-    out <== a + sel * (b - a);
-}
-
 // Large integer modular exponentiation
 // Given a large integer A and modulus M, both as arrays of N limbs of size n
 // Compute A^e mod M for some integer e (input as a signal), where e is up to K bits
@@ -308,7 +293,7 @@ template BigModExp(N, n, K) {
 
     // Step 3: Pre-declare all required components
     component modmul[2 * K];
-    component muxes[K][N];    // One BigMux1 per bit per limb
+    component muxes[K][N];    // One Mux1 per bit per limb
 
     // Step 4: Iterate over each bit of the exponent
     for (var i = 0; i < K; i++) {
@@ -318,9 +303,9 @@ template BigModExp(N, n, K) {
         modmul[2 * i].b <== currentA[i];
         modmul[2 * i].mod <== mod;
 
-        // 4.2: Use BigMux1 to select between R[i] and modmul[2*i].C for each limb
+        // 4.2: Use Mux1 to select between R[i] and modmul[2*i].C for each limb
         for (var j = 0; j < N; j++) {
-            muxes[i][j] = BigMux();
+            muxes[i][j] = Mux();
             muxes[i][j].a <== R[i][j];
             muxes[i][j].b <== modmul[2 * i].out[j];
             muxes[i][j].sel <== e_bits[i];

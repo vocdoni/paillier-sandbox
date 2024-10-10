@@ -1,11 +1,21 @@
 package circom
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/witness"
+	"github.com/niclabs/tcpaillier"
+)
+
+const (
+	// paillier parameters
+	bitSize = 64
+	s       = uint8(1)
+	l       = uint8(5) // number of shares
+	k       = uint8(3) // threshold
 )
 
 // BigIntToArray converts a big.Int into an array of k big.Int elements, it is
@@ -50,6 +60,18 @@ func BigIntArrayToStringArray(arr []*big.Int) []string {
 	return ret
 }
 
+func IntArrayToStringArray(arr []int, n int) []string {
+	strArr := make([]string, n)
+	for i := 0; i < n; i++ {
+		if i < len(arr) {
+			strArr[i] = fmt.Sprint(arr[i])
+		} else {
+			strArr[i] = "0"
+		}
+	}
+	return strArr
+}
+
 func CompileAndGenerateProof(inputs []byte, wasmFile, zkeyFile string) (string, string, error) {
 	finalInputs, err := witness.ParseInputs(inputs)
 	if err != nil {
@@ -76,4 +98,51 @@ func CompileAndGenerateProof(inputs []byte, wasmFile, zkeyFile string) (string, 
 		return "", "", err
 	}
 	return prover.Groth16ProverRaw(bZkey, w)
+}
+
+func EncryptWithPaillier(raw *big.Int) (*tcpaillier.PubKey, *big.Int, *big.Int, error) {
+	// generate the public key
+	_, pk, err := tcpaillier.NewKey(bitSize, s, l, k)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// get a random mod
+	rnd, err := pk.RandomModNToSPlusOneStar()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// encrypt with rnd
+	c, err := pk.EncryptFixed(raw, rnd)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return pk, rnd, c, nil
+}
+
+// BallotConfig holds the configuration for the ballot protocol
+type BallotConfig struct {
+	MaxCount int
+	Base     int
+}
+
+// powBigInt computes base^exp using big.Int
+func powBigInt(base, exp int) *big.Int {
+	result := big.NewInt(1)
+	bBase := big.NewInt(int64(base))
+
+	for i := 0; i < exp; i++ {
+		result.Mul(result, bBase)
+	}
+
+	return result
+}
+
+// EncodeBallot encodes the ballot into a single big.Int number
+func EncodeBallot(ballot []int, config BallotConfig) *big.Int {
+	encoded := big.NewInt(0)
+	for i, value := range ballot {
+		positionValue := new(big.Int).Mul(big.NewInt(int64(value)), powBigInt(config.Base, config.MaxCount-i-1))
+		encoded.Add(encoded, positionValue)
+	}
+	return encoded
 }
