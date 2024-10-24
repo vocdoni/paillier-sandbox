@@ -3,6 +3,7 @@ pragma circom 2.1.0;
 include "./ballot_protocol.circom";
 include "./ballot_encoder.circom";
 include "./paillier_cipher.circom";
+include "./lib/poseidon.circom";
 
 // VocdoniZ is the circuit to prove a valid vote in the Vocdoni scheme. The 
 // vote is valid if it meets the Ballot Protocol requirements, but also if the
@@ -29,6 +30,10 @@ template VocdoniZ(n_fields, l_size, n_limbs) {
     signal input r_to_n_to_s[n_limbs];      // private
     signal input n_to_s_plus_one[n_limbs];  // public
     signal input ciphertext[n_limbs];       // public
+    // Nullifier inputs
+    signal input nullifier;  // public
+    signal input commitment; // private
+    signal input secret;     // private
     // 1. Check the vote meets the Ballot Protocol requirements
     component ballotProtocol = BallotProtocol(n_fields);
     ballotProtocol.fields <== fields;
@@ -53,6 +58,11 @@ template VocdoniZ(n_fields, l_size, n_limbs) {
     encryptWithPaillier.r_to_n_to_s <== r_to_n_to_s;
     encryptWithPaillier.n_to_s_plus_one <== n_to_s_plus_one;
     encryptWithPaillier.ciphertext <== ciphertext;
+    // 4. Check the nullifier
+    component hash = Poseidon(2);
+    hash.inputs[0] <== commitment;
+    hash.inputs[1] <== secret;
+    hash.out === nullifier;
 }
 
-component main{public [max_count, force_uniqueness, max_value, min_value, max_total_cost, min_total_cost, cost_exp, cost_from_weight, weight, base, n_plus_one, n_to_s_plus_one, ciphertext]} = VocdoniZ(10, 32, 16);
+component main{public [max_count, force_uniqueness, max_value, min_value, max_total_cost, min_total_cost, cost_exp, cost_from_weight, weight, base, n_plus_one, n_to_s_plus_one, ciphertext, nullifier]} = VocdoniZ(5, 32, 8);

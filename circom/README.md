@@ -141,16 +141,16 @@ VocdoniZ is the circuit to prove a valid vote in the Vocdoni scheme. The vote is
 The circuit checks the the vote over the params provided using the BallotProtocol template, encodes the vote using the BallotEncoder template and compares the result with the encrypted vote.
 
 ```
-template instances: 33
-non-linear constraints: 675069
+template instances: 104
+non-linear constraints: 134160
 linear constraints: 0
-public inputs: 72
-private inputs: 12
+public inputs: 35
+private inputs: 15
 public outputs: 0
-wires: 667975
-labels: 948750
+wires: 132758
+labels: 189042
 ```
-For `n_fields = 10`, `l_size = 32` and `n_limbs = 16`.
+For `n_fields = 5`, `l_size = 32` and `n_limbs = 8`.
 
 ### Inputs
 
@@ -171,6 +171,9 @@ For `n_fields = 10`, `l_size = 32` and `n_limbs = 16`.
 | n_plus_one | `Pub` | `[]int` | `g` component |
 | r_to_n_to_s | `Priv` | `[]int` | `n^r^s mod n^s+1` component precalculated |
 | n_to_s_plus_one | `Pub` | `[]int` | `n^s+1` component precalculated |
+| nullifier | `Pub` | `int` | The voter nullifier: *Hash(commitment, secret)* |
+| commitment | `Priv` | `int` | The first part of the pre-image of the nullifier |
+| secret | `Priv` | `int` | The second part of the pre-image of the nullifier |
 
 ### Parameters
 

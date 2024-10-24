@@ -35,10 +35,10 @@ template BallotEncoder(n_fields) {
     component pow[n_fields];
     component n2b[n_fields];
     for (var i = 0; i < n_fields; i++) {
-        n2b[i] = Num2Bits_unsafe(252);
+        n2b[i] = Num2Bits_unsafe(100);
         n2b[i].in <== exp;
 
-        pow[i] = Pow(252);
+        pow[i] = Pow(100);
         pow[i].base <== base;
         pow[i].exp_bits <== n2b[i].out;
 
