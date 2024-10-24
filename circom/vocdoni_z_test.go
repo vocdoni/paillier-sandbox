@@ -61,6 +61,10 @@ func TestVocdoniZ(t *testing.T) {
 		commitment,
 		util.BigToFF(new(big.Int).SetBytes(secret)),
 	})
+	if err != nil {
+		log.Fatalf("Error hashing: %v\n", err)
+		return
+	}
 	log.Println("Commitment:", commitment)
 	log.Println("Nullifier:", nullifier)
 	// circuit inputs
